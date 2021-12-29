@@ -1,0 +1,133 @@
+<%- include("src/header.ejs", { bot, user, path, pageName: 'Panel'}) %>
+<% 
+
+let server;
+if(userVoice) {
+  if (!servers.has(userVoice.guild.id)) {
+      servers.set(userVoice.guild.id, {
+          queue: [],
+          currentVideo: {
+              url: "",
+              title: "Rien pour le moment."
+          },
+          dispatcher: null,
+          connection: null,
+          cooldown: false,
+      });
+  }
+  server = servers.get(userVoice.guild.id);
+}
+
+%> 
+
+<main role="main">
+  <section class="jumbotron">
+<!-- <%-// userVoice ? `<h1 class="userVoice">L'utilisateur ${user.username} est connecté au salon ${userVoice.channel.name} sur le serveur ${userVoice.guild.name}</h1>` : "<h1>Vous n'êtes dans aucun salon vocale.</h1>" -%> -->
+<h1 id="voice-state-alert">Chargement en cours...</h1>
+<form id="dispatcher">
+  <input type="button" class="dispatcher-btn skipdown" disabled id="skipdown">
+  <!-- <input type="button" id="dispatcher-btn" class="dispatcher-btn <%- // server ? (server.dispatcher ? (server.dispatcher.state.status === "paused" ? "btn-pause\"" : (server.dispatcher.state.status === "playing" ? "btn-play\"" : "btn-pause\" disabled") ) : "btn-pause\" disabled") : "btn-pause\" disabled" -%> id="pause-btn" onclick="pauseMusic()"> -->
+  <input type="button" id="dispatcher-btn" class="dispatcher-btn btn-pause" disabled id="pause-btn" onclick="pauseMusic()">
+  <input type="button" class="dispatcher-btn skipup" disabled id="skipup">
+</form>
+<p id="alert"></p>
+  </section>
+</main>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io()
+const alert = document.getElementById('alert')
+const skipup = document.getElementById('skipup')
+const skipdown = document.getElementById('skipdown')
+const button = document.getElementById('dispatcher-btn')
+const stateText = document.getElementById('voice-state-alert')
+
+function disable(state) {
+  if(typeof state !== "boolean") {
+    return console.log('Disable arguments must be a boolean')
+  }
+  skipup.disabled = state
+  skipdown.disabled = state
+  button.disabled = state
+}
+
+function pauseMusic() {
+  button.disabled = true
+  button.classList.add('spinner-border')
+  socket.emit('pause')
+}
+
+socket.on('userVoice', (response) => {
+  if(response.succes === true) {
+    button.disabled = false
+    if(response.state === "playing") {
+      button.classList.remove('btn-pause')
+      button.classList.add('btn-play')
+    } else if(response.state === "paused") {
+      button.classList.remove('btn-play')
+      button.classList.add('btn-pause')
+    }
+    if(response.msg) {
+      stateText.innerHTML = `<a href="${response.msg.url}">${response.msg.title}</a>`
+    } else {
+      stateText.innerText = "pas de musik zbi"
+    }
+  } else {
+    disable(true)
+    stateText.innerText = response.msg
+  }
+})
+
+socket.on('error', (response) => {
+  disable(true)
+  button.classList.remove('spinner-border')
+  button.classList.remove('btn-play')
+  button.classList.add('btn-pause')
+  alert.innerText = response.msg
+  alert.style.display = "block"
+  setTimeout(() => {
+    alert.style.display = "none"
+  }, 2500)
+})
+
+socket.on('paused', () => {
+  button.disabled = false
+  button.classList.remove('spinner-border')
+  button.classList.remove('btn-play')
+  button.classList.add('btn-pause')
+})
+
+socket.on('resumed', () => {
+  button.disabled = false
+  button.classList.remove('spinner-border')
+  button.classList.remove('btn-pause')
+  button.classList.add('btn-play')
+})
+
+// socket.on('pause', (response) => {
+//   if(response.succes === true && response.msg === 'paused') {
+//     button.disabled = false
+//     button.classList.remove('spinner-border')
+//     button.classList.remove('btn-play')
+//     button.classList.add('btn-pause')
+//   } else if(response.succes === true && response.msg === 'resumed') {
+//     button.disabled = false
+//     button.classList.remove('spinner-border')
+//     button.classList.remove('btn-pause')
+//     button.classList.add('btn-play')
+//   } else if(response.succes === false) {
+//     disable(true)
+//     button.classList.remove('spinner-border')
+//     button.classList.remove('btn-play')
+//     button.classList.add('btn-pause')
+//     alert.innerText = response.msg
+//     alert.style.display = "block"
+//     setTimeout(() => {
+//       alert.style.display = "none"
+//     }, 2500)
+//   }
+// })
+
+</script>
+
+<%- include("src/footer.ejs", { footer: false }) %>
